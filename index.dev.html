@@ -504,9 +504,9 @@ function update(dt) {
         const t = map[r][c];
         if (t === WALL || t === GATE) continue;
         if (r === player.row && c === player.col) continue;
-        // Exclude ghost pen area (rows 7-12, cols 6-12)
-        if (r >= 7 && r <= 12 && c >= 6 && c <= 12) continue;
-        // Exclude outer tunnel void rows
+        // Exclude ghost pen + tunnel area (rows 6-12 entirely)
+        if (r >= 6 && r <= 12) continue;
+        // Exclude outer edges
         if (c <= 0 || c >= COLS - 1) continue;
         // Count open neighbours (no gates — player can't pass gates)
         let exits = 0;
