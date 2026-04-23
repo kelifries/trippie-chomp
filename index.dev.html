@@ -98,7 +98,7 @@ canvas { display: block; image-rendering: pixelated; }
 <script>
 (function(){
 const COLS = 19, ROWS = 21;
-const WALL = 1, DOT = 2, POWER = 3, EMPTY = 0, GATE = 4, SHIELD = 6, FREEZE = 7, WARP = 8, BOOST = 10;
+const WALL = 1, DOT = 2, POWER = 3, EMPTY = 0, GATE = 4;
 const DIR = { NONE: -1, UP: 0, DOWN: 1, LEFT: 2, RIGHT: 3 };
 const DX = [0, 0, -1, 1], DY = [-1, 1, 0, 0];
 const OPPOSITE = [1, 0, 3, 2];
@@ -106,9 +106,9 @@ const OPPOSITE = [1, 0, 3, 2];
 const BASE_MAP = [
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
   [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
-  [1,6,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,7,1],
+  [1,3,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,3,1],
   [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,8,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
+  [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
   [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
   [1,1,1,1,2,1,1,1,0,1,0,1,1,1,2,1,1,1,1],
   [0,0,0,1,2,1,0,0,0,0,0,0,0,1,2,1,0,0,0],
@@ -119,9 +119,9 @@ const BASE_MAP = [
   [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
   [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
   [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-  [1,10,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
+  [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
   [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
-  [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,8,1],
+  [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
   [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
   [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -138,12 +138,15 @@ let isMobile = false;
 let audioCtx = null;
 let totalDotsEaten = 0, totalDeaths = 0, totalGhostsEaten = 0;
 let invincibleTimer = 0; // brief invincibility after respawn
-let shieldTimer = 0; // card shield — immune to ghosts
-let freezeTimer = 0; // rate lock — freeze all ghosts
-let boostTimer = 0; // speed boost
+let freezeTimer = 0; // rate lock (luggage)
+let boostTimer = 0; // speed boost (airplane)
 let popupText = ''; let popupTimer = 0; // power-up text popup
-const WARP_POINTS = [{ col: 1, row: 4 }, { col: 17, row: 17 }]; // passport teleport pair
-let warpCooldown = 0; // prevent instant back-and-forth warp
+
+// Random bonus spawn system
+let bonusItem = null; // { col, row, type: 'boost'|'teleport'|'freeze', timer: ms }
+let bonusSpawnTimer = 10000; // first bonus spawns after 10s
+const BONUS_TYPES = ['boost', 'teleport', 'freeze'];
+const BONUS_DURATION = 15000; // disappears after 15s
 
 // Preload images
 const gameBgImg = new Image();
@@ -199,14 +202,11 @@ const luggageSprite = createSprite((x, s) => {
   x.beginPath(); x.moveTo(32, 8); x.lineTo(26, 20); x.lineTo(38, 20); x.closePath(); x.fill();
 });
 
-const powerSprites = [
-  { img: new Image(), row: 2, col: 1 },   // card — shield
-  { img: lockSprite, row: 2, col: 17 },    // lock — freeze
-  { img: new Image(), row: 15, col: 1 },   // airplane — ghost scare
-  { img: luggageSprite, row: 15, col: 17 }, // luggage — fire
-];
-powerSprites[0].img.src = 'sprite-card.png';
-powerSprites[2].img.src = 'sprite-airplane.png';
+// All 4 corners use YouTrip card sprite
+const cardImg = new Image();
+cardImg.src = 'sprite-card.png';
+const airplaneImg = new Image();
+airplaneImg.src = 'sprite-airplane.png';
 
 const trippieSprites = { a: new Image(), b: new Image(), c: new Image(), d: new Image() };
 trippieSprites.a.src = 'sprite-trippie-a.png';
@@ -224,14 +224,6 @@ ghostSprites.chaserDead.src = 'sprite-chaser-dead.png';
 ghostSprites.ambusher.src = 'sprite-ambusher.png';
 ghostSprites.ambusherDead.src = 'sprite-ambusher-dead.png';
 
-function getPowerSprite(row, col) {
-  for (const ps of powerSprites) {
-    if (ps.row === row && ps.col === col) return ps.img;
-  }
-  return null;
-}
-// Shield sprite uses the card sprite
-const shieldSprite = { img: powerSprites[0].img, row: 2, col: 1 };
 
 // ---- AUDIO ----
 function initAudio() {
@@ -268,7 +260,7 @@ function playSound(type) {
 function cloneMap() { return BASE_MAP.map(r => [...r]); }
 function countDots(m) {
   let c = 0;
-  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) if (m[r][col] === DOT || m[r][col] === POWER || m[r][col] === SHIELD || m[r][col] === FREEZE || m[r][col] === BOOST) c++;
+  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) if (m[r][col] === DOT || m[r][col] === POWER) c++;
   return c;
 }
 function isWalkable(m, col, row) {
@@ -413,6 +405,8 @@ function startLevel() {
   player = makePlayer(level);
   ghosts = makeGhosts(level);
   powerTimer = 0; ghostScore = 200;
+  bonusItem = null; bonusSpawnTimer = 10000;
+  boostTimer = 0; freezeTimer = 0;
   updateHUD();
 }
 
@@ -491,11 +485,30 @@ function update(dt) {
   if (state !== 'playing') return;
 
   if (invincibleTimer > 0) invincibleTimer -= dt;
-  if (shieldTimer > 0) shieldTimer -= dt;
   if (freezeTimer > 0) freezeTimer -= dt;
   if (boostTimer > 0) boostTimer -= dt;
-  if (warpCooldown > 0) warpCooldown -= dt;
   if (popupTimer > 0) popupTimer -= dt;
+
+  // Bonus spawn system
+  if (!bonusItem) {
+    bonusSpawnTimer -= dt;
+    if (bonusSpawnTimer <= 0) {
+      // Spawn a random bonus on a random empty tile
+      const empties = [];
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (map[r][c] === EMPTY && !(r === player.row && c === player.col)) empties.push({ col: c, row: r });
+      }
+      if (empties.length > 0) {
+        const spot = empties[Math.floor(Math.random() * empties.length)];
+        const type = BONUS_TYPES[Math.floor(Math.random() * BONUS_TYPES.length)];
+        bonusItem = { col: spot.col, row: spot.row, type: type, timer: BONUS_DURATION };
+      }
+      bonusSpawnTimer = 15000 + Math.random() * 5000; // next one in 15-20s
+    }
+  } else {
+    bonusItem.timer -= dt;
+    if (bonusItem.timer <= 0) bonusItem = null; // expired
+  }
   if (powerTimer > 0) {
     powerTimer -= dt;
     if (powerTimer <= 0) { powerTimer = 0; ghosts.forEach(g => { g.scared = false; }); }
@@ -547,31 +560,36 @@ function collectAtTile(col, row) {
     ghosts.forEach(g => { if (!g.eaten && !g.home && !g.respawning) g.scared = true; });
     popupText = 'FEE MONSTERS ARE DEAD!'; popupTimer = 2000;
     playSound('power');
-  } else if (tile === SHIELD) {
-    map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
-    shieldTimer = 7000;
-    popupText = 'IMMUNITY!'; popupTimer = 2000;
-    playSound('power');
-  } else if (tile === FREEZE) {
-    map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
-    freezeTimer = 5000; // 5 seconds freeze
-    popupText = 'RATES LOCKED!'; popupTimer = 2000;
-    playSound('power');
-  } else if (tile === BOOST) {
-    map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
-    boostTimer = 5000; // 5 seconds 2x speed
-    popupText = 'JET MODE!'; popupTimer = 2000;
-    playSound('power');
-  } else if (tile === WARP && warpCooldown <= 0) {
-    // Teleport to the other warp point
-    const other = WARP_POINTS.find(w => w.col !== col || w.row !== row);
-    if (other) {
-      player.col = other.col; player.row = other.row;
-      player.px = other.col; player.py = other.row;
-      warpCooldown = 1000; // 1 second cooldown to prevent instant back-warp
-      popupText = 'PASSPORT CONTROL!'; popupTimer = 1500;
-      playSound('power');
+  }
+  // Check bonus item collection
+  if (bonusItem && col === bonusItem.col && row === bonusItem.row) {
+    const type = bonusItem.type;
+    score += 100;
+    bonusItem = null;
+    if (type === 'boost') {
+      boostTimer = 7000;
+      popupText = 'JET MODE!'; popupTimer = 2000;
+    } else if (type === 'freeze') {
+      freezeTimer = 5000;
+      popupText = 'RATES LOCKED!'; popupTimer = 2000;
+    } else if (type === 'teleport') {
+      // Teleport to random safe tile (away from ghosts)
+      const safeTiles = [];
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (map[r][c] !== WALL && map[r][c] !== GATE) {
+          let safe = true;
+          ghosts.forEach(g => { if (!g.home && !g.respawning && Math.abs(g.col - c) + Math.abs(g.row - r) < 5) safe = false; });
+          if (safe) safeTiles.push({ col: c, row: r });
+        }
+      }
+      if (safeTiles.length > 0) {
+        const dest = safeTiles[Math.floor(Math.random() * safeTiles.length)];
+        player.col = dest.col; player.row = dest.row;
+        player.px = dest.col; player.py = dest.row;
+      }
+      popupText = 'PASSPORT CONTROL!'; popupTimer = 2000;
     }
+    playSound('power');
   }
   if (dotsLeft <= 0) { state = 'levelwin'; levelWinTimer = 120; }
   updateHUD();
@@ -746,7 +764,7 @@ function checkCollisions() {
     if (g.col === player.col && g.row === player.row) {
       if (g.scared) {
         g.eaten = true; g.scared = false; score += ghostScore; ghostScore *= 2; totalGhostsEaten++; playSound('ghost');
-      } else if (invincibleTimer <= 0 && shieldTimer <= 0) {
+      } else if (invincibleTimer <= 0) {
         state = 'dying'; dyingTimer = 60; totalDeaths++; playSound('die');
       }
     }
@@ -787,66 +805,39 @@ function draw() {
         ctx.fillStyle = '#FFD700';
         ctx.beginPath(); ctx.arc(x + half, y + half, T * 0.12, 0, Math.PI * 2); ctx.fill();
       } else if (t === POWER) {
-        const spr = getPowerSprite(r, c);
-        if (spr && spr.complete && spr.naturalWidth > 0) {
+        // YouTrip card — all corners
+        if (cardImg.complete && cardImg.naturalWidth > 0) {
           const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
           const size = T * 1.4 * pulse;
-          ctx.drawImage(spr, x + half - size/2, y + half - size/2, size, size);
-        } else {
-          const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.005);
-          ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
-          ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 6;
-          ctx.beginPath(); ctx.arc(x + half, y + half, T * 0.3, 0, Math.PI * 2); ctx.fill();
-          ctx.shadowBlur = 0;
-        }
-      } else if (t === SHIELD) {
-        // Card shield pellet — render with teal glow
-        const spr = shieldSprite.img;
-        if (spr && spr.complete && spr.naturalWidth > 0) {
-          const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
-          const size = T * 1.4 * pulse;
-          ctx.shadowColor = '#00D2C8'; ctx.shadowBlur = 10;
-          ctx.drawImage(spr, x + half - size/2, y + half - size/2, size, size);
-          ctx.shadowBlur = 0;
-        }
-      } else if (t === FREEZE) {
-        // Lock freeze pellet — blue icy glow
-        const spr = lockSprite;
-        if (spr && spr.complete && spr.naturalWidth > 0) {
-          const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
-          const size = T * 1.4 * pulse;
-          ctx.shadowColor = '#4FC3F7'; ctx.shadowBlur = 10;
-          ctx.drawImage(spr, x + half - size/2, y + half - size/2, size, size);
-          ctx.shadowBlur = 0;
-        }
-      } else if (t === WARP) {
-        // Passport teleport — passport icon with purple glow
-        const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.005);
-        ctx.shadowColor = '#E040FB'; ctx.shadowBlur = 12 * pulse;
-        // Glow circle behind
-        ctx.fillStyle = `rgba(224, 64, 251, ${0.12 * pulse})`;
-        ctx.beginPath(); ctx.arc(x + half, y + half, T * 0.55, 0, Math.PI * 2); ctx.fill();
-        // Passport icon
-        if (passportSprite.complete && passportSprite.naturalWidth > 0) {
-          const size = T * 1.3;
-          ctx.drawImage(passportSprite, x + half - size/2, y + half - size/2, size, size);
-        }
-        ctx.shadowBlur = 0;
-      } else if (t === BOOST) {
-        // Airplane boost pellet
-        const spr = powerSprites[2].img;
-        if (spr && spr.complete && spr.naturalWidth > 0) {
-          const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
-          const size = T * 1.4 * pulse;
-          ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 10;
-          ctx.drawImage(spr, x + half - size/2, y + half - size/2, size, size);
-          ctx.shadowBlur = 0;
+          ctx.drawImage(cardImg, x + half - size/2, y + half - size/2, size, size);
         }
       } else if (t === GATE) {
         ctx.fillStyle = '#FF69B4';
         ctx.fillRect(x, y + half - 1.5, T, 3);
       }
     }
+  }
+
+  // Bonus item
+  if (bonusItem) {
+    const bx = bonusItem.col * T, by = bonusItem.row * T;
+    const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.005);
+    const size = T * 1.4 * pulse;
+    // Blink when about to expire (last 3s)
+    if (bonusItem.timer < 3000 && Math.floor(bonusItem.timer / 200) % 2 === 0) {
+      ctx.globalAlpha = 0.3;
+    }
+    let spr = null;
+    let glowColor = '#FFD700';
+    if (bonusItem.type === 'boost') { spr = airplaneImg; glowColor = '#FFD700'; }
+    else if (bonusItem.type === 'teleport') { spr = passportSprite; glowColor = '#E040FB'; }
+    else if (bonusItem.type === 'freeze') { spr = luggageSprite; glowColor = '#4FC3F7'; }
+    if (spr && spr.complete && spr.naturalWidth > 0) {
+      ctx.shadowColor = glowColor; ctx.shadowBlur = 12;
+      ctx.drawImage(spr, bx + half - size/2, by + half - size/2, size, size);
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1;
   }
 
   // Trippie sprite (using interpolated position)
@@ -882,28 +873,6 @@ function draw() {
           ctx.arc(px + size/2 + trailDx * T * 0.3 * i, py + size/2 + trailDy * T * 0.3 * i, T * (0.2 - i * 0.04), 0, Math.PI * 2);
           ctx.fill();
         }
-      }
-      // Shield glow effect
-      if (shieldTimer > 0) {
-        // Blink in last 1.5 seconds
-        if (shieldTimer < 1500 && Math.floor(shieldTimer / 120) % 2 === 0) {
-          ctx.globalAlpha = 0.4;
-        }
-        // Teal glow ring
-        const glowPulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.006);
-        ctx.shadowColor = '#00D2C8';
-        ctx.shadowBlur = 25 * glowPulse;
-        // Draw glow circle behind Trippie — large and visible
-        ctx.fillStyle = `rgba(0, 210, 200, ${0.2 * glowPulse})`;
-        ctx.beginPath();
-        ctx.arc(px + size / 2, py + size / 2, size * 0.75, 0, Math.PI * 2);
-        ctx.fill();
-        // Inner brighter ring
-        ctx.strokeStyle = `rgba(0, 210, 200, ${0.4 * glowPulse})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(px + size / 2, py + size / 2, size * 0.6, 0, Math.PI * 2);
-        ctx.stroke();
       }
       ctx.drawImage(spr, px, py, size, size);
       ctx.shadowBlur = 0;
