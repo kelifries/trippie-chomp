@@ -143,7 +143,7 @@ let boostTimer = 0; // speed boost (airplane)
 let popupText = ''; let popupTimer = 0; // power-up text popup
 
 // Random bonus spawn system
-let bonusItem = null; // { col, row, type: 'boost'|'teleport'|'freeze', timer: ms }
+let bonusItem = null; // { col, row, type: 'boost'|'teleport'|'freeze', timer: ms, col2, row2 (for teleport pair) }
 let bonusSpawnTimer = 10000; // first bonus spawns after 10s
 const BONUS_TYPES = ['boost', 'teleport', 'freeze'];
 const BONUS_DURATION = 15000; // disappears after 15s
@@ -498,10 +498,19 @@ function update(dt) {
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         if (map[r][c] === EMPTY && !(r === player.row && c === player.col)) empties.push({ col: c, row: r });
       }
-      if (empties.length > 0) {
-        const spot = empties[Math.floor(Math.random() * empties.length)];
+      if (empties.length > 1) {
         const type = BONUS_TYPES[Math.floor(Math.random() * BONUS_TYPES.length)];
+        const idx1 = Math.floor(Math.random() * empties.length);
+        const spot = empties[idx1];
         bonusItem = { col: spot.col, row: spot.row, type: type, timer: BONUS_DURATION };
+        if (type === 'teleport') {
+          // Pick second point far from first
+          empties.splice(idx1, 1);
+          const far = empties.filter(e => Math.abs(e.col - spot.col) + Math.abs(e.row - spot.row) > 8);
+          const pool = far.length > 0 ? far : empties;
+          const spot2 = pool[Math.floor(Math.random() * pool.length)];
+          bonusItem.col2 = spot2.col; bonusItem.row2 = spot2.row;
+        }
       }
       bonusSpawnTimer = 15000 + Math.random() * 5000; // next one in 15-20s
     }
@@ -562,34 +571,36 @@ function collectAtTile(col, row) {
     playSound('power');
   }
   // Check bonus item collection
-  if (bonusItem && col === bonusItem.col && row === bonusItem.row) {
-    const type = bonusItem.type;
-    score += 100;
-    bonusItem = null;
-    if (type === 'boost') {
-      boostTimer = 7000;
-      popupText = 'JET MODE!'; popupTimer = 2000;
-    } else if (type === 'freeze') {
-      freezeTimer = 5000;
-      popupText = 'RATES LOCKED!'; popupTimer = 2000;
-    } else if (type === 'teleport') {
-      // Teleport to random safe tile (away from ghosts)
-      const safeTiles = [];
-      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-        if (map[r][c] !== WALL && map[r][c] !== GATE) {
-          let safe = true;
-          ghosts.forEach(g => { if (!g.home && !g.respawning && Math.abs(g.col - c) + Math.abs(g.row - r) < 5) safe = false; });
-          if (safe) safeTiles.push({ col: c, row: r });
-        }
+  if (bonusItem) {
+    let collected = false;
+    if (col === bonusItem.col && row === bonusItem.row) {
+      collected = true;
+      if (bonusItem.type === 'teleport' && bonusItem.col2 !== undefined) {
+        // Teleport to the other passport point
+        player.col = bonusItem.col2; player.row = bonusItem.row2;
+        player.px = bonusItem.col2; player.py = bonusItem.row2;
       }
-      if (safeTiles.length > 0) {
-        const dest = safeTiles[Math.floor(Math.random() * safeTiles.length)];
-        player.col = dest.col; player.row = dest.row;
-        player.px = dest.col; player.py = dest.row;
-      }
-      popupText = 'PASSPORT CONTROL!'; popupTimer = 2000;
+    } else if (bonusItem.type === 'teleport' && col === bonusItem.col2 && row === bonusItem.row2) {
+      collected = true;
+      // Teleport to the first passport point
+      player.col = bonusItem.col; player.row = bonusItem.row;
+      player.px = bonusItem.col; player.py = bonusItem.row;
     }
-    playSound('power');
+    if (collected) {
+      const type = bonusItem.type;
+      score += 100;
+      bonusItem = null;
+      if (type === 'boost') {
+        boostTimer = 7000;
+        popupText = 'JET MODE!'; popupTimer = 2000;
+      } else if (type === 'freeze') {
+        freezeTimer = 5000;
+        popupText = 'RATES LOCKED!'; popupTimer = 2000;
+      } else if (type === 'teleport') {
+        popupText = 'PASSPORT CONTROL!'; popupTimer = 2000;
+      }
+      playSound('power');
+    }
   }
   if (dotsLeft <= 0) { state = 'levelwin'; levelWinTimer = 120; }
   updateHUD();
@@ -820,24 +831,36 @@ function draw() {
 
   // Bonus item
   if (bonusItem) {
-    const bx = bonusItem.col * T, by = bonusItem.row * T;
     const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.005);
     const size = T * 1.4 * pulse;
-    // Blink when about to expire (last 3s)
-    if (bonusItem.timer < 3000 && Math.floor(bonusItem.timer / 200) % 2 === 0) {
-      ctx.globalAlpha = 0.3;
-    }
-    let spr = null;
-    let glowColor = '#FFD700';
+    const blinking = bonusItem.timer < 3000 && Math.floor(bonusItem.timer / 200) % 2 === 0;
+
+    let spr = null, glowColor = '#FFD700';
     if (bonusItem.type === 'boost') { spr = airplaneImg; glowColor = '#FFD700'; }
     else if (bonusItem.type === 'teleport') { spr = passportSprite; glowColor = '#E040FB'; }
     else if (bonusItem.type === 'freeze') { spr = luggageSprite; glowColor = '#4FC3F7'; }
+
+    // Draw first point
+    if (blinking) ctx.globalAlpha = 0.3;
     if (spr && spr.complete && spr.naturalWidth > 0) {
+      const bx = bonusItem.col * T, by = bonusItem.row * T;
       ctx.shadowColor = glowColor; ctx.shadowBlur = 12;
       ctx.drawImage(spr, bx + half - size/2, by + half - size/2, size, size);
       ctx.shadowBlur = 0;
     }
     ctx.globalAlpha = 1;
+
+    // Draw second passport point
+    if (bonusItem.type === 'teleport' && bonusItem.col2 !== undefined) {
+      if (blinking) ctx.globalAlpha = 0.3;
+      if (spr && spr.complete && spr.naturalWidth > 0) {
+        const bx2 = bonusItem.col2 * T, by2 = bonusItem.row2 * T;
+        ctx.shadowColor = glowColor; ctx.shadowBlur = 12;
+        ctx.drawImage(spr, bx2 + half - size/2, by2 + half - size/2, size, size);
+        ctx.shadowBlur = 0;
+      }
+      ctx.globalAlpha = 1;
+    }
   }
 
   // Trippie sprite (using interpolated position)
