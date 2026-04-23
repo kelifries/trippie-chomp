@@ -498,13 +498,17 @@ function update(dt) {
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         if (map[r][c] === EMPTY && !(r === player.row && c === player.col)) empties.push({ col: c, row: r });
       }
-      // Only spawn on walkable tiles with at least 2 open neighbours (not dead ends)
+      // Only spawn on corridor tiles (not ghost pen, not dead ends)
       const walkable = [];
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         const t = map[r][c];
         if (t === WALL || t === GATE) continue;
         if (r === player.row && c === player.col) continue;
-        // Count open neighbours
+        // Exclude ghost pen area (rows 7-12, cols 6-12)
+        if (r >= 7 && r <= 12 && c >= 6 && c <= 12) continue;
+        // Exclude outer tunnel void rows
+        if (c <= 0 || c >= COLS - 1) continue;
+        // Count open neighbours (no gates — player can't pass gates)
         let exits = 0;
         for (let d = 0; d < 4; d++) {
           const nc = c + DX[d], nr = r + DY[d];
