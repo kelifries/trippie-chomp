@@ -544,6 +544,19 @@ function update(dt) {
     moveGhost(g, dt);
   });
 
+  // Fire mode — continuously kill ghosts within 4 tiles
+  if (fireTimer > 0) {
+    ghosts.forEach(g => {
+      if (g.home || g.respawning || g.eaten) return;
+      const d = Math.abs(g.col - player.col) + Math.abs(g.row - player.row);
+      if (d <= 4) {
+        g.eaten = true; g.scared = false;
+        score += 200; totalGhostsEaten++;
+        playSound('ghost');
+      }
+    });
+  }
+
   checkCollisions();
 }
 
@@ -574,16 +587,7 @@ function collectAtTile(col, row) {
     playSound('power');
   } else if (tile === FIRE) {
     map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
-    fireTimer = 2000; // 2 second fire visual
-    // Kill all ghosts within 4 tile radius
-    ghosts.forEach(g => {
-      if (g.home || g.respawning || g.eaten) return;
-      const d = Math.abs(g.col - col) + Math.abs(g.row - row);
-      if (d <= 4) {
-        g.eaten = true; g.scared = false;
-        score += 200; totalGhostsEaten++;
-      }
-    });
+    fireTimer = 7000; // 7 seconds on fire
     popupText = 'FIRE RATES!'; popupTimer = 2000;
     playSound('power');
   } else if (tile === WARP && warpCooldown <= 0) {
