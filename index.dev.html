@@ -482,16 +482,13 @@ function update(dt) {
   movePlayer(dt);
 
   ghosts.forEach(g => {
-    // Freeze spawn/respawn timers during power-up
-    const frozen = powerTimer > 0;
-
     // Handle respawn delay
     if (g.respawning) {
-      if (!frozen) g.respawnTimer -= dt;
+      g.respawnTimer -= dt;
       if (g.respawnTimer <= 0) {
         g.respawning = false;
         g.eaten = false;
-        g.scared = false;
+        g.scared = powerTimer > 0; // spawn scared if power-up active
         g.col = 9; g.row = 7;
         g.px = 9; g.py = 7;
         g.dir = DIR.LEFT;
@@ -499,8 +496,11 @@ function update(dt) {
       return;
     }
     if (g.home) {
-      if (!frozen) g.homeTimer -= dt * 0.06;
-      if (g.homeTimer <= 0) { g.home = false; g.col = 9; g.row = 7; g.px = 9; g.py = 7; g.dir = DIR.LEFT; }
+      g.homeTimer -= dt * 0.06;
+      if (g.homeTimer <= 0) {
+        g.home = false; g.col = 9; g.row = 7; g.px = 9; g.py = 7; g.dir = DIR.LEFT;
+        if (powerTimer > 0) g.scared = true; // spawn scared if power-up active
+      }
       return;
     }
     moveGhost(g, dt);
@@ -522,7 +522,7 @@ function collectAtTile(col, row) {
     map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
     powerTimer = 7000; ghostScore = 200;
     ghosts.forEach(g => { if (!g.eaten && !g.home && !g.respawning) g.scared = true; });
-    popupText = 'GHOST DEAD!'; popupTimer = 2000;
+    popupText = 'FEE MONSTERS ARE DEAD!'; popupTimer = 2000;
     playSound('power');
   } else if (tile === SHIELD) {
     map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
@@ -865,7 +865,7 @@ function draw() {
     ctx.font = `bold ${Math.round(T * 0.8)}px "Press Start 2P", monospace`;
     ctx.textAlign = 'center';
     ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
-    ctx.fillText(popupText, cw / 2, T * 3 - yOffset);
+    ctx.fillText(popupText, cw / 2, ch / 2 - yOffset);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
