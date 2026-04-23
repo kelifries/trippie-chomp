@@ -139,6 +139,7 @@ let audioCtx = null;
 let totalDotsEaten = 0, totalDeaths = 0, totalGhostsEaten = 0;
 let invincibleTimer = 0; // brief invincibility after respawn
 let shieldTimer = 0; // card shield — immune to ghosts
+let popupText = ''; let popupTimer = 0; // power-up text popup
 
 // Preload images
 const gameBgImg = new Image();
@@ -472,6 +473,7 @@ function update(dt) {
 
   if (invincibleTimer > 0) invincibleTimer -= dt;
   if (shieldTimer > 0) shieldTimer -= dt;
+  if (popupTimer > 0) popupTimer -= dt;
   if (powerTimer > 0) {
     powerTimer -= dt;
     if (powerTimer <= 0) { powerTimer = 0; ghosts.forEach(g => { g.scared = false; }); }
@@ -520,10 +522,12 @@ function collectAtTile(col, row) {
     map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
     powerTimer = 7000; ghostScore = 200;
     ghosts.forEach(g => { if (!g.eaten && !g.home && !g.respawning) g.scared = true; });
+    popupText = 'GHOST DEAD!'; popupTimer = 2000;
     playSound('power');
   } else if (tile === SHIELD) {
     map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
-    shieldTimer = 5000; // 5 seconds immunity
+    shieldTimer = 7000; // 7 seconds immunity
+    popupText = 'IMMUNITY!'; popupTimer = 2000;
     playSound('power');
   }
   if (dotsLeft <= 0) { state = 'levelwin'; levelWinTimer = 120; }
@@ -794,12 +798,18 @@ function draw() {
         // Teal glow ring
         const glowPulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.006);
         ctx.shadowColor = '#00D2C8';
-        ctx.shadowBlur = 15 * glowPulse;
-        // Draw glow circle behind Trippie
-        ctx.fillStyle = `rgba(0, 210, 200, ${0.15 * glowPulse})`;
+        ctx.shadowBlur = 25 * glowPulse;
+        // Draw glow circle behind Trippie — large and visible
+        ctx.fillStyle = `rgba(0, 210, 200, ${0.2 * glowPulse})`;
         ctx.beginPath();
-        ctx.arc(px + size / 2, py + size / 2, size * 0.55, 0, Math.PI * 2);
+        ctx.arc(px + size / 2, py + size / 2, size * 0.75, 0, Math.PI * 2);
         ctx.fill();
+        // Inner brighter ring
+        ctx.strokeStyle = `rgba(0, 210, 200, ${0.4 * glowPulse})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px + size / 2, py + size / 2, size * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
       }
       ctx.drawImage(spr, px, py, size, size);
       ctx.shadowBlur = 0;
@@ -843,6 +853,22 @@ function draw() {
       if (g.eaten) ctx.globalAlpha = 1;
     }
   });
+
+  // Power-up popup text
+  if (popupTimer > 0) {
+    const fadeIn = Math.min(1, (2000 - popupTimer) / 200); // fade in over 200ms
+    const fadeOut = Math.min(1, popupTimer / 300); // fade out over 300ms
+    const alpha = Math.min(fadeIn, fadeOut);
+    const yOffset = (1 - fadeIn) * 10; // slide up slightly
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#00D2C8';
+    ctx.font = `bold ${Math.round(T * 0.8)}px "Press Start 2P", monospace`;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+    ctx.fillText(popupText, cw / 2, T * 3 - yOffset);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
 }
 
 // ---- SHARE IMAGE GENERATOR ----
