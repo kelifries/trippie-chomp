@@ -1,0 +1,8 @@
+node_modules/
+.netlify/
+assets/
+.DS_Store
+debug.html
+trippie-pacman.html
+package.json
+package-lock.json
