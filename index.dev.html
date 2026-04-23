@@ -295,9 +295,9 @@ function makeGhosts(lvl) {
   const baseSpeed = Math.min(0.06 + (lvl - 1) * 0.008, 0.15);
   return [
     { col: 9, row: 7, dir: DIR.LEFT, ai: 'chase', sprite: 'chaser', speed: baseSpeed, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 0, px: 9, py: 7, patrolIdx: 0 },
-    { col: 8, row: 9, dir: DIR.UP, ai: 'ambush', sprite: 'ambusher', speed: baseSpeed, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 420, px: 8, py: 9, patrolIdx: 0 },
-    { col: 10, row: 9, dir: DIR.UP, ai: 'patrol', sprite: 'ambusher', speed: baseSpeed * 0.8, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 840, px: 10, py: 9, patrolIdx: 0 },
-    { col: 9, row: 9, dir: DIR.DOWN, ai: 'shy', sprite: 'chaser', speed: baseSpeed * 0.95, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 1260, px: 9, py: 9, patrolIdx: 1 },
+    { col: 8, row: 9, dir: DIR.UP, ai: 'ambush', sprite: 'ambusher', speed: baseSpeed, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 180, px: 8, py: 9, patrolIdx: 0 },
+    { col: 10, row: 9, dir: DIR.UP, ai: 'patrol', sprite: 'ambusher', speed: baseSpeed * 0.8, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 420, px: 10, py: 9, patrolIdx: 0 },
+    { col: 9, row: 9, dir: DIR.DOWN, ai: 'shy', sprite: 'chaser', speed: baseSpeed * 0.95, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 660, px: 9, py: 9, patrolIdx: 1 },
   ];
 }
 
@@ -741,7 +741,7 @@ function moveGhost(g, dt) {
       // Check pen arrival for eaten ghosts
       if (g.eaten && g.col >= 8 && g.col <= 10 && g.row >= 8 && g.row <= 10) {
         g.respawning = true;
-        g.respawnTimer = 3000;
+        g.respawnTimer = 1500;
         g.eaten = false;
         return;
       }
