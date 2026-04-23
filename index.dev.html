@@ -506,6 +506,8 @@ function update(dt) {
         if (r === player.row && c === player.col) continue;
         // Exclude ghost pen + tunnel area (rows 6-12 entirely)
         if (r >= 6 && r <= 12) continue;
+        // Exclude YouTrip card corners
+        if ((r === 2 && c === 1) || (r === 2 && c === 17) || (r === 15 && c === 1) || (r === 15 && c === 17)) continue;
         // Exclude outer edges
         if (c <= 0 || c >= COLS - 1) continue;
         // Count open neighbours (no gates — player can't pass gates)
