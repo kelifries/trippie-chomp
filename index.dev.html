@@ -773,7 +773,7 @@ function checkCollisions() {
     if (g.col === player.col && g.row === player.row) {
       if (g.scared) {
         g.eaten = true; g.scared = false; score += ghostScore; ghostScore *= 2; totalGhostsEaten++; playSound('ghost');
-      } else if (invincibleTimer <= 0 && shieldTimer <= 0) {
+      } else if (invincibleTimer <= 0 && shieldTimer <= 0 && fireTimer <= 0) {
         state = 'dying'; dyingTimer = 60; totalDeaths++; playSound('die');
       }
     }
