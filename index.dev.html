@@ -98,7 +98,7 @@ canvas { display: block; image-rendering: pixelated; }
 <script>
 (function(){
 const COLS = 19, ROWS = 21;
-const WALL = 1, DOT = 2, POWER = 3, EMPTY = 0, GATE = 4, SHIELD = 6, FREEZE = 7, WARP = 8;
+const WALL = 1, DOT = 2, POWER = 3, EMPTY = 0, GATE = 4, SHIELD = 6, FREEZE = 7, WARP = 8, BOOST = 10;
 const DIR = { NONE: -1, UP: 0, DOWN: 1, LEFT: 2, RIGHT: 3 };
 const DX = [0, 0, -1, 1], DY = [-1, 1, 0, 0];
 const OPPOSITE = [1, 0, 3, 2];
@@ -119,7 +119,7 @@ const BASE_MAP = [
   [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
   [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
   [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-  [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
+  [1,10,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
   [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
   [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,8,1],
   [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
@@ -140,6 +140,7 @@ let totalDotsEaten = 0, totalDeaths = 0, totalGhostsEaten = 0;
 let invincibleTimer = 0; // brief invincibility after respawn
 let shieldTimer = 0; // card shield — immune to ghosts
 let freezeTimer = 0; // rate lock — freeze all ghosts
+let boostTimer = 0; // speed boost
 let popupText = ''; let popupTimer = 0; // power-up text popup
 const WARP_POINTS = [{ col: 1, row: 4 }, { col: 17, row: 17 }]; // passport teleport pair
 let warpCooldown = 0; // prevent instant back-and-forth warp
@@ -267,7 +268,7 @@ function playSound(type) {
 function cloneMap() { return BASE_MAP.map(r => [...r]); }
 function countDots(m) {
   let c = 0;
-  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) if (m[r][col] === DOT || m[r][col] === POWER || m[r][col] === SHIELD || m[r][col] === FREEZE) c++;
+  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) if (m[r][col] === DOT || m[r][col] === POWER || m[r][col] === SHIELD || m[r][col] === FREEZE || m[r][col] === BOOST) c++;
   return c;
 }
 function isWalkable(m, col, row) {
@@ -492,6 +493,7 @@ function update(dt) {
   if (invincibleTimer > 0) invincibleTimer -= dt;
   if (shieldTimer > 0) shieldTimer -= dt;
   if (freezeTimer > 0) freezeTimer -= dt;
+  if (boostTimer > 0) boostTimer -= dt;
   if (warpCooldown > 0) warpCooldown -= dt;
   if (popupTimer > 0) popupTimer -= dt;
   if (powerTimer > 0) {
@@ -555,6 +557,11 @@ function collectAtTile(col, row) {
     freezeTimer = 5000; // 5 seconds freeze
     popupText = 'RATES LOCKED!'; popupTimer = 2000;
     playSound('power');
+  } else if (tile === BOOST) {
+    map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
+    boostTimer = 5000; // 5 seconds 2x speed
+    popupText = 'JET MODE!'; popupTimer = 2000;
+    playSound('power');
   } else if (tile === WARP && warpCooldown <= 0) {
     // Teleport to the other warp point
     const other = WARP_POINTS.find(w => w.col !== col || w.row !== row);
@@ -571,7 +578,8 @@ function collectAtTile(col, row) {
 }
 
 function movePlayer(dt) {
-  let remaining = player.speed * dt * 0.06;
+  const speedMult = boostTimer > 0 ? 2 : 1;
+  let remaining = player.speed * speedMult * dt * 0.06;
 
   // Instant reverse
   if (player.nextDir !== DIR.NONE && player.nextDir === OPPOSITE[player.dir]) {
@@ -824,6 +832,16 @@ function draw() {
           ctx.drawImage(passportSprite, x + half - size/2, y + half - size/2, size, size);
         }
         ctx.shadowBlur = 0;
+      } else if (t === BOOST) {
+        // Airplane boost pellet
+        const spr = powerSprites[2].img;
+        if (spr && spr.complete && spr.naturalWidth > 0) {
+          const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
+          const size = T * 1.4 * pulse;
+          ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 10;
+          ctx.drawImage(spr, x + half - size/2, y + half - size/2, size, size);
+          ctx.shadowBlur = 0;
+        }
       } else if (t === GATE) {
         ctx.fillStyle = '#FF69B4';
         ctx.fillRect(x, y + half - 1.5, T, 3);
@@ -847,6 +865,23 @@ function draw() {
       // Flash during invincibility after death
       if (invincibleTimer > 0 && Math.floor(invincibleTimer / 100) % 2 === 0) {
         ctx.globalAlpha = 0.4;
+      }
+      // Speed boost effect — yellow trail
+      if (boostTimer > 0) {
+        // Blink near end
+        if (boostTimer < 1500 && Math.floor(boostTimer / 120) % 2 === 0) {
+          ctx.globalAlpha = 0.5;
+        }
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 18;
+        // Speed lines behind Trippie
+        const trailDx = -DX[player.dir] || 0, trailDy = -DY[player.dir] || 0;
+        for (let i = 1; i <= 3; i++) {
+          ctx.fillStyle = `rgba(255, 215, 0, ${0.3 - i * 0.08})`;
+          ctx.beginPath();
+          ctx.arc(px + size/2 + trailDx * T * 0.3 * i, py + size/2 + trailDy * T * 0.3 * i, T * (0.2 - i * 0.04), 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       // Shield glow effect
       if (shieldTimer > 0) {
