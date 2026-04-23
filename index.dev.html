@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Trippie Chomp</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100dvh; overflow: hidden; background: #0D0D1A; font-family: 'Press Start 2P', monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
+#game-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; background: url('game-bg.png') center bottom / cover no-repeat; }
+#hud { display: none; color: #fff; font-size: 14px; padding: 8px 12px; width: 100%; max-width: 400px; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 2; }
+#hud span { display: inline-flex; align-items: center; gap: 4px; }
+#hud .lives-display { display: inline-flex; align-items: center; gap: 2px; }
+#hud .lives-display img { width: 20px; height: 20px; image-rendering: pixelated; }
+#canvas-wrap { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; z-index: 1; }
+canvas { display: block; image-rendering: pixelated; }
+
+/* Start Screen */
+#start-screen { position: fixed; inset: 0; z-index: 20; background: url('game-over-bg.png') center bottom / cover no-repeat; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 20px; }
+.ss-trippie { width: 160px; height: auto; image-rendering: pixelated; margin-bottom: 20px; filter: drop-shadow(0 4px 24px rgba(128,0,255,0.4)); }
+.ss-title { color: #fff; font-size: 18px; text-align: center; line-height: 1.6; margin-bottom: 16px; letter-spacing: 2px; text-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+.ss-desc { color: rgba(255,255,255,0.7); font-size: 8px; text-align: center; line-height: 1.8; margin-bottom: 28px; letter-spacing: 1px; max-width: 280px; }
+.ss-btn { background: #00D2C8; color: #0D0D1A; border: none; border-radius: 30px; padding: 16px 48px; font-family: 'Press Start 2P', monospace; font-size: 12px; letter-spacing: 2px; cursor: pointer; box-shadow: 0 4px 20px rgba(0,210,200,0.4); }
+.ss-btn:active { background: #00b5ad; }
+.ss-tcs { color: rgba(255,255,255,0.25); font-size: 7px; margin-top: 20px; }
+
+/* Game Over Screen */
+#gameover-screen { position: fixed; inset: 0; z-index: 20; display: none; flex-direction: column; align-items: center; justify-content: center; background: url('game-over-bg.png') center bottom / cover no-repeat; overflow-y: auto; padding: 16px; }
+.go-card { background: rgba(30, 20, 50, 0.75); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 24px 20px 20px; max-width: 360px; width: 100%; display: flex; flex-direction: column; align-items: center; margin-top: 20px; }
+.go-title { color: #fff; font-size: 18px; margin-bottom: 16px; text-align: center; letter-spacing: 2px; }
+.go-trippie { width: 200px; height: auto; margin-bottom: 12px; image-rendering: pixelated; }
+.go-savings { color: #FFD700; font-size: 16px; margin-bottom: 20px; text-align: center; letter-spacing: 1px; }
+.go-stats { display: flex; gap: 8px; width: 100%; margin-bottom: 20px; }
+.go-stat { flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 6px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.go-stat-label { color: rgba(255,255,255,0.65); font-size: 7px; line-height: 1.4; text-transform: uppercase; letter-spacing: 0.5px; }
+.go-stat-val { color: #fff; font-size: 18px; font-weight: bold; }
+.go-buttons { display: flex; flex-direction: column; gap: 10px; width: 100%; align-items: center; }
+.go-btn { width: 100%; padding: 14px 8px; border: none; border-radius: 10px; font-family: 'Press Start 2P', monospace; cursor: pointer; text-align: center; letter-spacing: 0.5px; }
+.go-btn-share { background: #00D2C8; color: #0D0D1A; font-size: 10px; padding: 16px 8px; }
+.go-btn-share:active { background: #00b5ad; }
+.go-btn-play { background: transparent; color: rgba(255,255,255,0.6); font-size: 8px; border: 1px solid rgba(255,255,255,0.2); padding: 12px 8px; }
+.go-btn-play:active { background: rgba(255,255,255,0.1); }
+.go-cta-line { color: rgba(255,255,255,0.5); font-size: 7px; text-align: center; line-height: 1.6; margin-top: 4px; letter-spacing: 0.5px; }
+.go-tcs { color: rgba(255,255,255,0.3); font-size: 7px; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<!-- Start Screen -->
+<div id="start-screen">
+  <img src="trippie-face.png" class="ss-trippie" alt="Trippie">
+  <div class="ss-title">CHOMP YOUR WAY<br>TO THE BEST RATES</div>
+  <div class="ss-desc">EAT CURRENCIES. DODGE FEE MONSTERS. STACK SAVINGS TO GET THE HIGHEST SCORE.</div>
+  <button class="ss-btn" id="ss-play-btn">PLAY NOW</button>
+  <div class="ss-tcs">*T&Cs apply.</div>
+</div>
+
+<!-- Game Over Screen -->
+<div id="gameover-screen">
+  <div class="go-card">
+    <div class="go-title">GAME OVER</div>
+    <img src="trippie-coins.png" class="go-trippie" alt="Trippie">
+    <div class="go-savings" id="go-savings">YOU SAVED S$0!</div>
+    <div class="go-stats">
+      <div class="go-stat">
+        <span class="go-stat-label">CURRENCIES<br>EATEN</span>
+        <span class="go-stat-val" id="go-currencies">0</span>
+      </div>
+      <div class="go-stat">
+        <span class="go-stat-label">LEVEL<br>REACHED</span>
+        <span class="go-stat-val" id="go-level">1</span>
+      </div>
+      <div class="go-stat">
+        <span class="go-stat-label">FEE MONSTERS<br>EATEN</span>
+        <span class="go-stat-val" id="go-ghosts-eaten">0</span>
+      </div>
+    </div>
+    <div class="go-buttons">
+      <button class="go-btn go-btn-share" id="go-share-btn">SHARE ON INSTAGRAM</button>
+      <button class="go-btn go-btn-play" id="go-play-btn">PLAY AGAIN</button>
+    </div>
+    <div class="go-cta-line">SHARE ON IG & STAND A CHANCE<br>TO WIN A YEAR OF TRAVEL ON US</div>
+  </div>
+  <div class="go-tcs">*T&Cs apply.</div>
+</div>
+
+<!-- Game -->
+<div id="game-wrapper">
+  <div id="hud">
+    <span>SCORE: <b id="score-val">0</b></span>
+    <span>LVL: <b id="level-val">1</b></span>
+    <span class="lives-display" id="lives-val"></span>
+  </div>
+  <div id="canvas-wrap"><canvas id="c"></canvas></div>
+</div>
+
+<script>
+(function(){
+const COLS = 19, ROWS = 21;
+const WALL = 1, DOT = 2, POWER = 3, EMPTY = 0, GATE = 4, SHIELD = 6;
+const DIR = { NONE: -1, UP: 0, DOWN: 1, LEFT: 2, RIGHT: 3 };
+const DX = [0, 0, -1, 1], DY = [-1, 1, 0, 0];
+const OPPOSITE = [1, 0, 3, 2];
+
+const BASE_MAP = [
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+  [1,6,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,3,1],
+  [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+  [1,2,1,1,2,1,2,1,1,1,1,1,2,1,2,1,1,2,1],
+  [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
+  [1,1,1,1,2,1,1,1,0,1,0,1,1,1,2,1,1,1,1],
+  [0,0,0,1,2,1,0,0,0,0,0,0,0,1,2,1,0,0,0],
+  [1,1,1,1,2,1,0,1,1,4,1,1,0,1,2,1,1,1,1],
+  [0,0,0,0,2,0,0,1,0,0,0,1,0,0,2,0,0,0,0],
+  [1,1,1,1,2,1,0,1,0,0,0,1,0,1,2,1,1,1,1],
+  [0,0,0,1,2,1,0,1,1,1,1,1,0,1,2,1,0,0,0],
+  [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
+  [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
+  [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
+  [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
+  [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
+  [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,2,1],
+  [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
+  [1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+];
+
+let TILE, canvas, ctx, hud;
+let map, score, lives, level, dotsLeft, state;
+let player, ghosts, powerTimer, ghostScore;
+let lastTime, accumulator;
+const TICK = 1000 / 60;
+let mouthAngle = 0, mouthDir = 1;
+let dyingTimer = 0, levelWinTimer = 0;
+let isMobile = false;
+let audioCtx = null;
+let totalDotsEaten = 0, totalDeaths = 0, totalGhostsEaten = 0;
+let invincibleTimer = 0; // brief invincibility after respawn
+let shieldTimer = 0; // card shield — immune to ghosts
+
+// Preload images
+const gameBgImg = new Image();
+gameBgImg.src = 'game-bg.png';
+const gameOverBgImg = new Image();
+gameOverBgImg.src = 'game-over-bg.png';
+const trippieCoinsImg = new Image();
+trippieCoinsImg.src = 'trippie-coins.png';
+
+// Generate luggage sprite on offscreen canvas
+function createLuggageSprite() {
+  const s = 64, c = document.createElement('canvas');
+  c.width = s; c.height = s;
+  const x = c.getContext('2d');
+  // Handle
+  x.fillStyle = '#8B6914';
+  x.beginPath(); x.roundRect(24, 4, 16, 10, 3); x.fill();
+  // Body
+  x.fillStyle = '#FFD700';
+  x.beginPath(); x.roundRect(10, 14, 44, 36, 6); x.fill();
+  // Darker band
+  x.fillStyle = '#DAA520';
+  x.fillRect(10, 28, 44, 6);
+  // Clasp
+  x.fillStyle = '#FFF8DC';
+  x.fillRect(28, 26, 8, 10);
+  // Wheels
+  x.fillStyle = '#333';
+  x.beginPath(); x.arc(20, 52, 4, 0, Math.PI * 2); x.fill();
+  x.beginPath(); x.arc(44, 52, 4, 0, Math.PI * 2); x.fill();
+  // Highlight
+  x.fillStyle = 'rgba(255,255,255,0.3)';
+  x.fillRect(14, 17, 18, 4);
+  const img = new Image();
+  img.src = c.toDataURL();
+  return img;
+}
+
+const powerSprites = [
+  { img: new Image(), row: 2, col: 1 },
+  { img: new Image(), row: 2, col: 17 },
+  { img: new Image(), row: 15, col: 1 },
+  { img: null, row: 15, col: 17 },
+];
+powerSprites[0].img.src = 'sprite-card.png';
+powerSprites[1].img.src = 'sprite-globe.png';
+powerSprites[2].img.src = 'sprite-airplane.png';
+powerSprites[3].img = createLuggageSprite();
+
+const trippieSprites = { a: new Image(), b: new Image(), c: new Image(), d: new Image() };
+trippieSprites.a.src = 'sprite-trippie-a.png';
+trippieSprites.b.src = 'sprite-trippie-b.png';
+trippieSprites.c.src = 'sprite-trippie-c.png';
+trippieSprites.d.src = 'sprite-trippie-d.png';
+let lastHDir = 'right';
+
+const ghostSprites = {
+  chaser: new Image(), chaserDead: new Image(),
+  ambusher: new Image(), ambusherDead: new Image(),
+};
+ghostSprites.chaser.src = 'sprite-chaser.png';
+ghostSprites.chaserDead.src = 'sprite-chaser-dead.png';
+ghostSprites.ambusher.src = 'sprite-ambusher.png';
+ghostSprites.ambusherDead.src = 'sprite-ambusher-dead.png';
+
+function getPowerSprite(row, col) {
+  for (const ps of powerSprites) {
+    if (ps.row === row && ps.col === col) return ps.img;
+  }
+  return null;
+}
+// Shield sprite uses the card sprite
+const shieldSprite = { img: powerSprites[0].img, row: 2, col: 1 };
+
+// ---- AUDIO ----
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function playSound(type) {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  if (type === 'dot') {
+    osc.type = 'sine'; osc.frequency.setValueAtTime(587, now); osc.frequency.setValueAtTime(784, now + 0.04);
+    gain.gain.setValueAtTime(0.12, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    osc.start(now); osc.stop(now + 0.08);
+  } else if (type === 'power') {
+    osc.type = 'square'; osc.frequency.setValueAtTime(200, now); osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+    gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.start(now); osc.stop(now + 0.3);
+  } else if (type === 'ghost') {
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+    gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    osc.start(now); osc.stop(now + 0.25);
+  } else if (type === 'die') {
+    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.6);
+    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    osc.start(now); osc.stop(now + 0.7);
+  }
+}
+
+// ---- MAP ----
+function cloneMap() { return BASE_MAP.map(r => [...r]); }
+function countDots(m) {
+  let c = 0;
+  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) if (m[r][col] === DOT || m[r][col] === POWER || m[r][col] === SHIELD) c++;
+  return c;
+}
+function isWalkable(m, col, row) {
+  if (row < 0 || row >= ROWS) return false;
+  if (col < 0 || col >= COLS) return true;
+  return m[row][col] !== WALL;
+}
+function isWalkableForGhost(m, col, row, canPassGate) {
+  if (row < 0 || row >= ROWS) return false;
+  if (col < 0 || col >= COLS) return true;
+  const t = m[row][col];
+  if (t === WALL) return false;
+  if (t === GATE && !canPassGate) return false;
+  return true;
+}
+
+function makePlayer(lvl) {
+  // Classic Pacman: ~80% of tile per second at level 1. +15% bump from original.
+  const speed = Math.min(0.081 + (lvl - 1) * 0.01, 0.18);
+  return { col: 9, row: 15, dir: DIR.LEFT, nextDir: DIR.NONE, speed: speed, px: 9, py: 15 };
+}
+
+// Patrol route — patroller bounces between these waypoints
+const PATROL_ROUTE = [
+  { col: 1, row: 1 },
+  { col: 17, row: 1 },
+  { col: 17, row: 19 },
+  { col: 1, row: 19 },
+];
+
+function makeGhosts(lvl) {
+  const baseSpeed = Math.min(0.041 + (lvl - 1) * 0.008, 0.13);
+  return [
+    { col: 9, row: 7, dir: DIR.LEFT, ai: 'chase', sprite: 'chaser', speed: baseSpeed, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 0, px: 9, py: 7, patrolIdx: 0 },
+    { col: 8, row: 9, dir: DIR.UP, ai: 'ambush', sprite: 'ambusher', speed: baseSpeed, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 420, px: 8, py: 9, patrolIdx: 0 },
+    { col: 10, row: 9, dir: DIR.UP, ai: 'patrol', sprite: 'ambusher', speed: baseSpeed * 0.8, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 840, px: 10, py: 9, patrolIdx: 0 },
+    { col: 9, row: 9, dir: DIR.DOWN, ai: 'shy', sprite: 'chaser', speed: baseSpeed * 0.95, scared: false, eaten: false, respawning: false, respawnTimer: 0, home: true, homeTimer: 1260, px: 9, py: 9, patrolIdx: 1 },
+  ];
+}
+
+function dist(x1, y1, x2, y2) { return (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1); }
+
+function getTarget(ghost) {
+  if (ghost.eaten) return { col: 9, row: 7 };
+  if (ghost.scared) return { col: Math.random() * COLS | 0, row: Math.random() * ROWS | 0 };
+  switch (ghost.ai) {
+    case 'chase':
+      // Direct pursuit — always targets Trippie's current position
+      return { col: player.col, row: player.row };
+    case 'ambush':
+      // Targets 4 tiles ahead of where Trippie is facing — tries to cut you off
+      return { col: player.col + DX[player.dir] * 4, row: player.row + DY[player.dir] * 4 };
+    case 'patrol': {
+      // Loops between 4 corners — predictable moving obstacle
+      const target = PATROL_ROUTE[ghost.patrolIdx];
+      if (Math.abs(ghost.col - target.col) <= 2 && Math.abs(ghost.row - target.row) <= 2) {
+        ghost.patrolIdx = (ghost.patrolIdx + 1) % PATROL_ROUTE.length;
+      }
+      return PATROL_ROUTE[ghost.patrolIdx];
+    }
+    case 'shy': {
+      // Chases when far (>8 tiles), flees to corner when close
+      const d = Math.abs(ghost.col - player.col) + Math.abs(ghost.row - player.row);
+      if (d > 8) {
+        return { col: player.col, row: player.row }; // chase
+      }
+      // Flee — target the corner furthest from Trippie
+      let bestCorner = PATROL_ROUTE[0], bestDist = 0;
+      for (const c of PATROL_ROUTE) {
+        const cd = Math.abs(c.col - player.col) + Math.abs(c.row - player.row);
+        if (cd > bestDist) { bestDist = cd; bestCorner = c; }
+      }
+      return bestCorner;
+    }
+    default: return { col: Math.random() * COLS | 0, row: Math.random() * ROWS | 0 };
+  }
+}
+
+function chooseDir(ghost) {
+  const canGate = ghost.eaten || ghost.home;
+  const target = getTarget(ghost);
+  let bestDir = ghost.dir, bestDist = Infinity;
+  for (let d = 0; d < 4; d++) {
+    if (d === OPPOSITE[ghost.dir] && !ghost.home) continue;
+    const nc = ghost.col + DX[d], nr = ghost.row + DY[d];
+    if (!isWalkableForGhost(map, nc < 0 ? COLS - 1 : nc >= COLS ? 0 : nc, nr, canGate)) continue;
+    const dd = dist(nc, nr, target.col, target.row);
+    if (dd < bestDist) { bestDist = dd; bestDir = d; }
+  }
+  return bestDir;
+}
+
+// ---- CONTINUOUS MOVEMENT HELPERS ----
+function snapToTile(entity) {
+  entity.px = entity.col;
+  entity.py = entity.row;
+}
+
+// ---- SIZING ----
+function resize() {
+  const hudH = 32;
+  const availW = window.innerWidth - 8;
+  const availH = window.innerHeight - hudH - 16;
+  TILE = Math.floor(Math.min(availW / COLS, availH / ROWS));
+  TILE = Math.max(TILE, 10);
+  TILE = Math.min(TILE, 28);
+  canvas.width = COLS * TILE;
+  canvas.height = ROWS * TILE;
+  canvas.style.width = canvas.width + 'px';
+  canvas.style.height = canvas.height + 'px';
+  isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+// ---- INIT ----
+function init() {
+  canvas = document.getElementById('c');
+  ctx = canvas.getContext('2d');
+  hud = document.getElementById('hud');
+  state = 'start';
+  isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  resize();
+  window.addEventListener('resize', resize);
+  setupInput();
+  requestAnimationFrame(loop);
+}
+
+function startGame() {
+  initAudio();
+  score = 0; lives = 3; level = 1;
+  totalDotsEaten = 0; totalDeaths = 0; totalGhostsEaten = 0;
+  startLevel();
+  state = 'playing';
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('gameover-screen').style.display = 'none';
+  hud.style.display = 'flex';
+  resize();
+}
+
+function startLevel() {
+  map = cloneMap();
+  dotsLeft = countDots(map);
+  player = makePlayer(level);
+  ghosts = makeGhosts(level);
+  powerTimer = 0; ghostScore = 200;
+  updateHUD();
+}
+
+function resetAfterDeath() {
+  player = makePlayer(level);
+  ghosts = makeGhosts(level);
+  powerTimer = 0;
+  invincibleTimer = 2000; // 2s grace period after respawn
+}
+
+// ---- INPUT ----
+function setupInput() {
+  const ssBtn = document.getElementById('ss-play-btn');
+  ssBtn.addEventListener('click', e => { e.stopPropagation(); if (state === 'start') startGame(); });
+  ssBtn.addEventListener('touchend', e => { e.preventDefault(); e.stopPropagation(); if (state === 'start') startGame(); });
+
+  document.getElementById('go-play-btn').addEventListener('click', () => { if (state === 'gameover') startGame(); });
+  document.getElementById('go-share-btn').addEventListener('click', () => { if (state === 'gameover') shareToIG(); });
+
+  document.addEventListener('keydown', e => {
+    if (state === 'start') { if (e.key === 'Enter' || e.key === ' ') startGame(); return; }
+    if (state === 'gameover') { if (e.key === 'Enter' || e.key === ' ') startGame(); return; }
+    if (state !== 'playing') return;
+    switch (e.key) {
+      case 'ArrowUp': case 'w': case 'W': player.nextDir = DIR.UP; e.preventDefault(); break;
+      case 'ArrowDown': case 's': case 'S': player.nextDir = DIR.DOWN; e.preventDefault(); break;
+      case 'ArrowLeft': case 'a': case 'A': player.nextDir = DIR.LEFT; e.preventDefault(); break;
+      case 'ArrowRight': case 'd': case 'D': player.nextDir = DIR.RIGHT; e.preventDefault(); break;
+    }
+  });
+
+  // Swipe controls — prevent scroll, detect instantly
+  let touchStartX = 0, touchStartY = 0;
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    if (state === 'playing') e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('touchmove', e => {
+    if (state === 'playing') e.preventDefault(); // block scroll during gameplay
+    if (state !== 'playing') return;
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    const absDx = Math.abs(dx), absDy = Math.abs(dy);
+    if (Math.max(absDx, absDy) < 5) return; // 5px — very sensitive
+    let dir;
+    if (absDx > absDy) {
+      dir = dx > 0 ? DIR.RIGHT : DIR.LEFT;
+    } else {
+      dir = dy > 0 ? DIR.DOWN : DIR.UP;
+    }
+    player.nextDir = dir;
+    // Reset origin for continuous chained swipes
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: false });
+}
+
+// ---- UPDATE ----
+function update(dt) {
+  if (state === 'dying') {
+    dyingTimer -= dt;
+    if (dyingTimer <= 0) {
+      lives--;
+      if (lives <= 0) { state = 'gameover'; showGameOver(); }
+      else { resetAfterDeath(); state = 'playing'; }
+    }
+    updateHUD();
+    return;
+  }
+  if (state === 'levelwin') {
+    levelWinTimer -= dt;
+    if (levelWinTimer <= 0) { level++; startLevel(); state = 'playing'; }
+    return;
+  }
+  if (state !== 'playing') return;
+
+  if (invincibleTimer > 0) invincibleTimer -= dt;
+  if (shieldTimer > 0) shieldTimer -= dt;
+  if (powerTimer > 0) {
+    powerTimer -= dt;
+    if (powerTimer <= 0) { powerTimer = 0; ghosts.forEach(g => { g.scared = false; }); }
+  }
+
+  movePlayer(dt);
+
+  ghosts.forEach(g => {
+    // Freeze spawn/respawn timers during power-up
+    const frozen = powerTimer > 0;
+
+    // Handle respawn delay
+    if (g.respawning) {
+      if (!frozen) g.respawnTimer -= dt;
+      if (g.respawnTimer <= 0) {
+        g.respawning = false;
+        g.eaten = false;
+        g.scared = false;
+        g.col = 9; g.row = 7;
+        g.px = 9; g.py = 7;
+        g.dir = DIR.LEFT;
+      }
+      return;
+    }
+    if (g.home) {
+      if (!frozen) g.homeTimer -= dt * 0.06;
+      if (g.homeTimer <= 0) { g.home = false; g.col = 9; g.row = 7; g.px = 9; g.py = 7; g.dir = DIR.LEFT; }
+      return;
+    }
+    moveGhost(g, dt);
+  });
+
+  checkCollisions();
+}
+
+
+function playerAtCenter() {
+  return Math.abs(player.px - Math.round(player.px)) < 0.02 && Math.abs(player.py - Math.round(player.py)) < 0.02;
+}
+
+function collectAtTile(col, row) {
+  const tile = map[row][col];
+  if (tile === DOT) {
+    map[row][col] = EMPTY; score += 10; dotsLeft--; totalDotsEaten++; playSound('dot');
+  } else if (tile === POWER) {
+    map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
+    powerTimer = 7000; ghostScore = 200;
+    ghosts.forEach(g => { if (!g.eaten && !g.home && !g.respawning) g.scared = true; });
+    playSound('power');
+  } else if (tile === SHIELD) {
+    map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
+    shieldTimer = 5000; // 5 seconds immunity
+    playSound('power');
+  }
+  if (dotsLeft <= 0) { state = 'levelwin'; levelWinTimer = 120; }
+  updateHUD();
+}
+
+function movePlayer(dt) {
+  let remaining = player.speed * dt * 0.06;
+
+  // Instant reverse
+  if (player.nextDir !== DIR.NONE && player.nextDir === OPPOSITE[player.dir]) {
+    player.dir = player.nextDir;
+    player.nextDir = DIR.NONE;
+  }
+
+  // Snap-to-center turning — if close to a tile center and turn is valid, snap and turn now
+  if (player.nextDir !== DIR.NONE && player.nextDir !== player.dir) {
+    const nearCol = Math.round(player.px), nearRow = Math.round(player.py);
+    const distFromCenter = Math.abs(player.px - nearCol) + Math.abs(player.py - nearRow);
+    if (distFromCenter < 0.5) {
+      let nc = nearCol + DX[player.nextDir], nr = nearRow + DY[player.nextDir];
+      if (nc < 0) nc = COLS - 1; else if (nc >= COLS) nc = 0;
+      if (isWalkable(map, nc, nr) && map[nr][nc] !== GATE) {
+        player.col = nearCol; player.row = nearRow;
+        player.px = nearCol; player.py = nearRow;
+        player.dir = player.nextDir;
+        player.nextDir = DIR.NONE;
+      }
+    }
+  }
+
+  while (remaining > 0.001) {
+    if (player.dir === DIR.NONE) break;
+
+    // If at tile center, process turn/collect/wall check BEFORE moving
+    if (playerAtCenter()) {
+      player.col = Math.round(player.px);
+      player.row = Math.round(player.py);
+      if (player.col < 0) player.col = COLS - 1;
+      else if (player.col >= COLS) player.col = 0;
+      player.px = player.col;
+      player.py = player.row;
+
+      // Collect
+      collectAtTile(player.col, player.row);
+      if (state !== 'playing') return;
+
+      // Try queued turn
+      if (player.nextDir !== DIR.NONE) {
+        let nc = player.col + DX[player.nextDir], nr = player.row + DY[player.nextDir];
+        if (nc < 0) nc = COLS - 1; else if (nc >= COLS) nc = 0;
+        if (isWalkable(map, nc, nr) && map[nr][nc] !== GATE) {
+          player.dir = player.nextDir;
+          player.nextDir = DIR.NONE;
+        }
+      }
+
+      // Check if blocked ahead BEFORE moving
+      let nc = player.col + DX[player.dir], nr = player.row + DY[player.dir];
+      if (nc < 0) nc = COLS - 1; else if (nc >= COLS) nc = 0;
+      if (!isWalkable(map, nc, nr) || map[nr][nc] === GATE) {
+        break; // wall — stop
+      }
+    }
+
+    // Distance to next tile center
+    let distToCenter;
+    if (DX[player.dir] !== 0) {
+      distToCenter = DX[player.dir] > 0
+        ? Math.ceil(player.px + 0.01) - player.px
+        : player.px - Math.floor(player.px - 0.01);
+    } else {
+      distToCenter = DY[player.dir] > 0
+        ? Math.ceil(player.py + 0.01) - player.py
+        : player.py - Math.floor(player.py - 0.01);
+    }
+    if (distToCenter < 0.01) distToCenter = 1;
+
+    const step = Math.min(remaining, distToCenter);
+    player.px += DX[player.dir] * step;
+    player.py += DY[player.dir] * step;
+    remaining -= step;
+
+    // Tunnel wrap
+    if (player.px < -0.5) player.px += COLS;
+    else if (player.px >= COLS - 0.5) player.px -= COLS;
+
+    // Update col/row if crossed into new tile
+    const newCol = Math.round(player.px), newRow = Math.round(player.py);
+    if (newCol !== player.col || newRow !== player.row) {
+      player.col = newCol < 0 ? COLS - 1 : newCol >= COLS ? 0 : newCol;
+      player.row = newRow;
+    }
+  }
+
+  if (player.dir === DIR.LEFT) lastHDir = 'left';
+  else if (player.dir === DIR.RIGHT) lastHDir = 'right';
+
+  mouthAngle += mouthDir * 0.03;
+  if (mouthAngle > 0.35) mouthDir = -1;
+  if (mouthAngle < 0.02) mouthDir = 1;
+}
+
+function ghostAtCenter(g) {
+  return Math.abs(g.px - Math.round(g.px)) < 0.02 && Math.abs(g.py - Math.round(g.py)) < 0.02;
+}
+
+function moveGhost(g, dt) {
+  const spdMult = g.eaten ? 2 : g.scared ? 0.6 : 1;
+  let remaining = g.speed * spdMult * dt * 0.06;
+
+  while (remaining > 0.001) {
+    // At tile center — process before moving
+    if (ghostAtCenter(g)) {
+      g.col = Math.round(g.px);
+      g.row = Math.round(g.py);
+      if (g.col < 0) g.col = COLS - 1;
+      else if (g.col >= COLS) g.col = 0;
+      g.px = g.col;
+      g.py = g.row;
+
+      // Check pen arrival for eaten ghosts
+      if (g.eaten && g.col >= 8 && g.col <= 10 && g.row >= 8 && g.row <= 10) {
+        g.respawning = true;
+        g.respawnTimer = 3000;
+        g.eaten = false;
+        return;
+      }
+
+      // Choose direction
+      g.dir = chooseDir(g);
+      const canGate = g.eaten;
+      let nc = g.col + DX[g.dir], nr = g.row + DY[g.dir];
+      if (nc < 0) nc = COLS - 1; else if (nc >= COLS) nc = 0;
+      if (!isWalkableForGhost(map, nc, nr, canGate)) break;
+    }
+
+    // Distance to next tile center
+    let distToCenter;
+    if (DX[g.dir] !== 0) {
+      distToCenter = DX[g.dir] > 0
+        ? Math.ceil(g.px + 0.01) - g.px
+        : g.px - Math.floor(g.px - 0.01);
+    } else {
+      distToCenter = DY[g.dir] > 0
+        ? Math.ceil(g.py + 0.01) - g.py
+        : g.py - Math.floor(g.py - 0.01);
+    }
+    if (distToCenter < 0.01) distToCenter = 1;
+
+    const step = Math.min(remaining, distToCenter);
+    g.px += DX[g.dir] * step;
+    g.py += DY[g.dir] * step;
+    remaining -= step;
+
+    // Tunnel wrap
+    if (g.px < -0.5) g.px += COLS;
+    else if (g.px >= COLS - 0.5) g.px -= COLS;
+
+    // Update col/row if crossed into new tile
+    const newCol = Math.round(g.px), newRow = Math.round(g.py);
+    if (newCol !== g.col || newRow !== g.row) {
+      g.col = newCol < 0 ? COLS - 1 : newCol >= COLS ? 0 : newCol;
+      g.row = newRow;
+    }
+  }
+}
+
+function checkCollisions() {
+  ghosts.forEach(g => {
+    if (g.home || g.respawning || g.eaten) return;
+    if (g.col === player.col && g.row === player.row) {
+      if (g.scared) {
+        g.eaten = true; g.scared = false; score += ghostScore; ghostScore *= 2; totalGhostsEaten++; playSound('ghost');
+      } else if (invincibleTimer <= 0 && shieldTimer <= 0) {
+        state = 'dying'; dyingTimer = 60; totalDeaths++; playSound('die');
+      }
+    }
+  });
+}
+
+// ---- DRAW ----
+function draw() {
+  const T = TILE, half = T / 2;
+  const cw = COLS * T, ch = ROWS * T;
+
+  ctx.fillStyle = '#0D0D1A';
+  ctx.fillRect(0, 0, cw, ch);
+
+  if (state === 'start') return;
+
+  if (gameBgImg.complete && gameBgImg.naturalWidth > 0) {
+    ctx.globalAlpha = 0.3;
+    ctx.drawImage(gameBgImg, 0, 0, cw, ch);
+    ctx.globalAlpha = 1;
+  }
+
+  // Maze
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const t = map[r][c];
+      const x = c * T, y = r * T;
+      if (t === WALL) {
+        ctx.fillStyle = 'rgba(26, 26, 46, 0.85)';
+        ctx.fillRect(x, y, T, T);
+        ctx.strokeStyle = '#2A2A4E';
+        ctx.lineWidth = 0.5;
+        if (r > 0 && map[r-1][c] !== WALL) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + T, y); ctx.stroke(); }
+        if (r < ROWS-1 && map[r+1][c] !== WALL) { ctx.beginPath(); ctx.moveTo(x, y + T); ctx.lineTo(x + T, y + T); ctx.stroke(); }
+        if (c > 0 && map[r][c-1] !== WALL) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + T); ctx.stroke(); }
+        if (c < COLS-1 && map[r][c+1] !== WALL) { ctx.beginPath(); ctx.moveTo(x + T, y); ctx.lineTo(x + T, y + T); ctx.stroke(); }
+      } else if (t === DOT) {
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath(); ctx.arc(x + half, y + half, T * 0.12, 0, Math.PI * 2); ctx.fill();
+      } else if (t === POWER) {
+        const spr = getPowerSprite(r, c);
+        if (spr && spr.complete && spr.naturalWidth > 0) {
+          const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
+          const size = T * 1.4 * pulse;
+          ctx.drawImage(spr, x + half - size/2, y + half - size/2, size, size);
+        } else {
+          const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.005);
+          ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+          ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 6;
+          ctx.beginPath(); ctx.arc(x + half, y + half, T * 0.3, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      } else if (t === SHIELD) {
+        // Card shield pellet — render with teal glow
+        const spr = shieldSprite.img;
+        if (spr && spr.complete && spr.naturalWidth > 0) {
+          const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
+          const size = T * 1.4 * pulse;
+          ctx.shadowColor = '#00D2C8'; ctx.shadowBlur = 10;
+          ctx.drawImage(spr, x + half - size/2, y + half - size/2, size, size);
+          ctx.shadowBlur = 0;
+        }
+      } else if (t === GATE) {
+        ctx.fillStyle = '#FF69B4';
+        ctx.fillRect(x, y + half - 1.5, T, 3);
+      }
+    }
+  }
+
+  // Trippie sprite (using interpolated position)
+  if (state !== 'dying' || (dyingTimer > 0 && dyingTimer % 10 > 5)) {
+    const mouthOpen = mouthAngle > 0.18;
+    let spr;
+    if (lastHDir === 'right') {
+      spr = mouthOpen ? trippieSprites.b : trippieSprites.a;
+    } else {
+      spr = mouthOpen ? trippieSprites.c : trippieSprites.d;
+    }
+    if (spr.complete && spr.naturalWidth > 0) {
+      const size = T * 1.6;
+      const px = player.px * T + half - size / 2;
+      const py = player.py * T + half - size / 2;
+      // Flash during invincibility after death
+      if (invincibleTimer > 0 && Math.floor(invincibleTimer / 100) % 2 === 0) {
+        ctx.globalAlpha = 0.4;
+      }
+      // Shield glow effect
+      if (shieldTimer > 0) {
+        // Blink in last 1.5 seconds
+        if (shieldTimer < 1500 && Math.floor(shieldTimer / 120) % 2 === 0) {
+          ctx.globalAlpha = 0.4;
+        }
+        // Teal glow ring
+        const glowPulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.006);
+        ctx.shadowColor = '#00D2C8';
+        ctx.shadowBlur = 15 * glowPulse;
+        // Draw glow circle behind Trippie
+        ctx.fillStyle = `rgba(0, 210, 200, ${0.15 * glowPulse})`;
+        ctx.beginPath();
+        ctx.arc(px + size / 2, py + size / 2, size * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.drawImage(spr, px, py, size, size);
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
+  }
+  if (state === 'dying') {
+    const progress = 1 - dyingTimer / 60;
+    const mouthOpen = mouthAngle > 0.18;
+    let spr = lastHDir === 'right'
+      ? (mouthOpen ? trippieSprites.b : trippieSprites.a)
+      : (mouthOpen ? trippieSprites.c : trippieSprites.d);
+    if (spr.complete && spr.naturalWidth > 0) {
+      const size = T * 1.6 * (1 - progress);
+      const px = player.px * T + half - size / 2;
+      const py = player.py * T + half - size / 2;
+      ctx.globalAlpha = 1 - progress;
+      ctx.drawImage(spr, px, py, size, size);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Ghosts (sprite-based, interpolated)
+  ghosts.forEach(g => {
+    if (g.home || g.respawning) return;
+    let spr;
+    if (g.scared || g.eaten) {
+      spr = ghostSprites[g.sprite + 'Dead'];
+      if (powerTimer < 1500 && powerTimer > 0 && Math.floor(powerTimer / 150) % 2 === 0) {
+        spr = ghostSprites[g.sprite];
+      }
+    } else {
+      spr = ghostSprites[g.sprite];
+    }
+    if (spr && spr.complete && spr.naturalWidth > 0) {
+      const size = T * 1.6;
+      const gx = g.px * T + half - size / 2;
+      const gy = g.py * T + half - size / 2;
+      if (g.eaten) ctx.globalAlpha = 0.4;
+      ctx.drawImage(spr, gx, gy, size, size);
+      if (g.eaten) ctx.globalAlpha = 1;
+    }
+  });
+}
+
+// ---- SHARE IMAGE GENERATOR ----
+async function generateShareImage() {
+  const W = 1080, H = 1920;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d');
+
+  // Background
+  if (gameOverBgImg.complete && gameOverBgImg.naturalWidth > 0) {
+    // Cover-fit the background
+    const imgRatio = gameOverBgImg.naturalWidth / gameOverBgImg.naturalHeight;
+    const canvasRatio = W / H;
+    let sw, sh, sx, sy;
+    if (imgRatio > canvasRatio) {
+      sh = gameOverBgImg.naturalHeight;
+      sw = sh * canvasRatio;
+      sx = (gameOverBgImg.naturalWidth - sw) / 2;
+      sy = 0;
+    } else {
+      sw = gameOverBgImg.naturalWidth;
+      sh = sw / canvasRatio;
+      sx = 0;
+      sy = (gameOverBgImg.naturalHeight - sh) / 2;
+    }
+    x.drawImage(gameOverBgImg, sx, sy, sw, sh, 0, 0, W, H);
+  } else {
+    x.fillStyle = '#0D0D1A';
+    x.fillRect(0, 0, W, H);
+  }
+
+  // Semi-transparent card
+  const cardX = 60, cardY = 280, cardW = W - 120, cardH = 1100;
+  x.fillStyle = 'rgba(30, 20, 50, 0.8)';
+  x.beginPath();
+  x.roundRect(cardX, cardY, cardW, cardH, 32);
+  x.fill();
+  x.strokeStyle = 'rgba(255,255,255,0.12)';
+  x.lineWidth = 2;
+  x.stroke();
+
+  // "GAME OVER" title
+  x.fillStyle = '#fff';
+  x.font = '700 48px "Press Start 2P", monospace';
+  x.textAlign = 'center';
+  x.fillText('GAME OVER', W / 2, cardY + 80);
+
+  // Trippie in coins
+  if (trippieCoinsImg.complete && trippieCoinsImg.naturalWidth > 0) {
+    const imgW = 400, imgH = 400 * (trippieCoinsImg.naturalHeight / trippieCoinsImg.naturalWidth);
+    x.drawImage(trippieCoinsImg, (W - imgW) / 2, cardY + 110, imgW, imgH);
+  }
+
+  // "YOU SAVED" headline
+  x.fillStyle = '#FFD700';
+  x.font = '700 42px "Press Start 2P", monospace';
+  x.fillText(`YOU SAVED S$${score}!`, W / 2, cardY + 580);
+
+  // Stat boxes
+  const statY = cardY + 630, statH = 180, statGap = 20;
+  const statW = (cardW - statGap * 4) / 3;
+  const stats = [
+    { label: 'CURRENCIES\nEATEN', val: totalDotsEaten },
+    { label: 'LEVEL\nREACHED', val: level },
+    { label: 'FEE MONSTERS\nEATEN', val: totalGhostsEaten },
+  ];
+  stats.forEach((s, i) => {
+    const sx = cardX + statGap + i * (statW + statGap);
+    x.fillStyle = 'rgba(255,255,255,0.08)';
+    x.beginPath();
+    x.roundRect(sx, statY, statW, statH, 20);
+    x.fill();
+    x.strokeStyle = 'rgba(255,255,255,0.15)';
+    x.lineWidth = 1;
+    x.stroke();
+
+    // Label
+    x.fillStyle = 'rgba(255,255,255,0.6)';
+    x.font = '700 18px "Press Start 2P", monospace';
+    const lines = s.label.split('\n');
+    lines.forEach((line, li) => {
+      x.fillText(line, sx + statW / 2, statY + 50 + li * 28);
+    });
+
+    // Value
+    x.fillStyle = '#fff';
+    x.font = '700 48px "Press Start 2P", monospace';
+    x.fillText(String(s.val), sx + statW / 2, statY + 145);
+  });
+
+  // CTA line inside card, right below stats
+  x.fillStyle = 'rgba(255,255,255,0.6)';
+  x.font = '700 26px "Press Start 2P", monospace';
+  x.fillText('STAND A CHANCE TO WIN', W / 2, statY + statH + 100);
+  x.fillText('A YEAR OF TRAVEL', W / 2, statY + statH + 140);
+  x.fillText('FUNDED BY US', W / 2, statY + statH + 180);
+
+  // T&Cs
+  x.fillStyle = 'rgba(255,255,255,0.25)';
+  x.font = '700 16px "Press Start 2P", monospace';
+  x.fillText('*T&Cs apply.', W / 2, statY + statH + 225);
+
+  // Branding at bottom
+  x.fillStyle = '#00D2C8';
+  x.font = '700 28px "Press Start 2P", monospace';
+  x.fillText('TRIPPIE CHOMP', W / 2, H - 200);
+  x.fillStyle = 'rgba(255,255,255,0.4)';
+  x.font = '700 18px "Press Start 2P", monospace';
+  x.fillText('powered by YouTrip', W / 2, H - 160);
+
+  return new Promise(resolve => c.toBlob(resolve, 'image/png'));
+}
+
+async function shareToIG() {
+  const blob = await generateShareImage();
+  const file = new File([blob], 'trippie-pacman-score.png', { type: 'image/png' });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'Trippie Chomp',
+        text: `I saved S$${score} on Trippie Chomp! Can you beat my score?`,
+      });
+    } catch (e) {
+      if (e.name !== 'AbortError') downloadImage(blob);
+    }
+  } else {
+    downloadImage(blob);
+  }
+}
+
+function downloadImage(blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'trippie-pacman-score.png';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function showGameOver() {
+  document.getElementById('go-savings').textContent = `YOU SAVED S$${score}!`;
+  document.getElementById('go-currencies').textContent = totalDotsEaten;
+  document.getElementById('go-level').textContent = level;
+  document.getElementById('go-ghosts-eaten').textContent = totalGhostsEaten;
+  document.getElementById('gameover-screen').style.display = 'flex';
+  hud.style.display = 'none';
+}
+
+function updateHUD() {
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('level-val').textContent = level;
+  const livesEl = document.getElementById('lives-val');
+  livesEl.innerHTML = '';
+  for (let i = 0; i < lives; i++) {
+    const img = document.createElement('img');
+    img.src = 'trippie-face.png';
+    img.alt = 'life';
+    livesEl.appendChild(img);
+  }
+}
+
+function loop(ts) {
+  if (!lastTime) lastTime = ts;
+  let dt = ts - lastTime; lastTime = ts;
+  if (dt > 100) dt = 100;
+  accumulator += dt;
+  while (accumulator >= TICK) { update(TICK); accumulator -= TICK; }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+lastTime = 0; accumulator = 0;
+window.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
