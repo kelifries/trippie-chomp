@@ -498,16 +498,28 @@ function update(dt) {
       for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
         if (map[r][c] === EMPTY && !(r === player.row && c === player.col)) empties.push({ col: c, row: r });
       }
-      if (empties.length > 1) {
+      // Only spawn on walkable tiles with at least 2 open neighbours (not dead ends)
+      const walkable = [];
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        const t = map[r][c];
+        if (t === WALL || t === GATE) continue;
+        if (r === player.row && c === player.col) continue;
+        // Count open neighbours
+        let exits = 0;
+        for (let d = 0; d < 4; d++) {
+          const nc = c + DX[d], nr = r + DY[d];
+          if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS && map[nr][nc] !== WALL && map[nr][nc] !== GATE) exits++;
+        }
+        if (exits >= 2) walkable.push({ col: c, row: r });
+      }
+      if (walkable.length > 1) {
         const type = BONUS_TYPES[Math.floor(Math.random() * BONUS_TYPES.length)];
-        const idx1 = Math.floor(Math.random() * empties.length);
-        const spot = empties[idx1];
+        const idx1 = Math.floor(Math.random() * walkable.length);
+        const spot = walkable[idx1];
         bonusItem = { col: spot.col, row: spot.row, type: type, timer: BONUS_DURATION };
         if (type === 'teleport') {
-          // Pick second point far from first
-          empties.splice(idx1, 1);
-          const far = empties.filter(e => Math.abs(e.col - spot.col) + Math.abs(e.row - spot.row) > 8);
-          const pool = far.length > 0 ? far : empties;
+          const others = walkable.filter((e, i) => i !== idx1 && Math.abs(e.col - spot.col) + Math.abs(e.row - spot.row) > 8);
+          const pool = others.length > 0 ? others : walkable.filter((e, i) => i !== idx1);
           const spot2 = pool[Math.floor(Math.random() * pool.length)];
           bonusItem.col2 = spot2.col; bonusItem.row2 = spot2.row;
         }
