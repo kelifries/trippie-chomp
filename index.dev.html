@@ -98,7 +98,7 @@ canvas { display: block; image-rendering: pixelated; }
 <script>
 (function(){
 const COLS = 19, ROWS = 21;
-const WALL = 1, DOT = 2, POWER = 3, EMPTY = 0, GATE = 4, SHIELD = 6, FREEZE = 7, WARP = 8, FIRE = 9;
+const WALL = 1, DOT = 2, POWER = 3, EMPTY = 0, GATE = 4, SHIELD = 6, FREEZE = 7, WARP = 8;
 const DIR = { NONE: -1, UP: 0, DOWN: 1, LEFT: 2, RIGHT: 3 };
 const DX = [0, 0, -1, 1], DY = [-1, 1, 0, 0];
 const OPPOSITE = [1, 0, 3, 2];
@@ -119,7 +119,7 @@ const BASE_MAP = [
   [1,1,1,1,2,1,0,0,0,0,0,0,0,1,2,1,1,1,1],
   [1,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2,1],
   [1,2,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1],
-  [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,9,1],
+  [1,3,2,1,2,2,2,2,2,0,2,2,2,2,2,1,2,3,1],
   [1,1,2,1,2,1,2,1,1,1,1,1,2,1,2,1,2,1,1],
   [1,2,2,2,2,1,2,2,2,1,2,2,2,1,2,2,2,8,1],
   [1,2,1,1,1,1,1,1,2,1,2,1,1,1,1,1,1,2,1],
@@ -140,7 +140,6 @@ let totalDotsEaten = 0, totalDeaths = 0, totalGhostsEaten = 0;
 let invincibleTimer = 0; // brief invincibility after respawn
 let shieldTimer = 0; // card shield — immune to ghosts
 let freezeTimer = 0; // rate lock — freeze all ghosts
-let fireTimer = 0; // fire rates — visual effect after fire kill
 let popupText = ''; let popupTimer = 0; // power-up text popup
 const WARP_POINTS = [{ col: 1, row: 4 }, { col: 17, row: 17 }]; // passport teleport pair
 let warpCooldown = 0; // prevent instant back-and-forth warp
@@ -176,23 +175,8 @@ const lockSprite = createSprite((x, s) => {
   x.fillRect(30, 40, 4, 8);
 });
 
-const passportSprite = createSprite((x, s) => {
-  // Book body
-  x.fillStyle = '#E040FB';
-  x.beginPath(); x.roundRect(12, 6, 40, 52, 4); x.fill();
-  // Inner page
-  x.fillStyle = '#F3E5F5';
-  x.fillRect(16, 10, 34, 44);
-  // Stamp circle
-  x.strokeStyle = '#E040FB'; x.lineWidth = 2;
-  x.beginPath(); x.arc(33, 32, 12, 0, Math.PI * 2); x.stroke();
-  // Stamp lines
-  x.fillStyle = '#E040FB';
-  x.fillRect(25, 28, 16, 2);
-  x.fillRect(27, 33, 12, 2);
-  // Top text line
-  x.fillRect(20, 14, 20, 3);
-});
+const passportSprite = new Image();
+passportSprite.src = 'passport.png';
 
 const luggageSprite = createSprite((x, s) => {
   // Handle
@@ -283,7 +267,7 @@ function playSound(type) {
 function cloneMap() { return BASE_MAP.map(r => [...r]); }
 function countDots(m) {
   let c = 0;
-  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) if (m[r][col] === DOT || m[r][col] === POWER || m[r][col] === SHIELD || m[r][col] === FREEZE || m[r][col] === FIRE) c++;
+  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) if (m[r][col] === DOT || m[r][col] === POWER || m[r][col] === SHIELD || m[r][col] === FREEZE) c++;
   return c;
 }
 function isWalkable(m, col, row) {
@@ -508,7 +492,6 @@ function update(dt) {
   if (invincibleTimer > 0) invincibleTimer -= dt;
   if (shieldTimer > 0) shieldTimer -= dt;
   if (freezeTimer > 0) freezeTimer -= dt;
-  if (fireTimer > 0) fireTimer -= dt;
   if (warpCooldown > 0) warpCooldown -= dt;
   if (popupTimer > 0) popupTimer -= dt;
   if (powerTimer > 0) {
@@ -544,19 +527,6 @@ function update(dt) {
     moveGhost(g, dt);
   });
 
-  // Fire mode — continuously kill ghosts within 4 tiles
-  if (fireTimer > 0) {
-    ghosts.forEach(g => {
-      if (g.home || g.respawning || g.eaten) return;
-      const d = Math.abs(g.col - player.col) + Math.abs(g.row - player.row);
-      if (d <= 4) {
-        g.eaten = true; g.scared = false;
-        score += 200; totalGhostsEaten++;
-        playSound('ghost');
-      }
-    });
-  }
-
   checkCollisions();
 }
 
@@ -584,11 +554,6 @@ function collectAtTile(col, row) {
     map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
     freezeTimer = 5000; // 5 seconds freeze
     popupText = 'RATES LOCKED!'; popupTimer = 2000;
-    playSound('power');
-  } else if (tile === FIRE) {
-    map[row][col] = EMPTY; score += 50; dotsLeft--; totalDotsEaten++;
-    fireTimer = 7000; // 7 seconds on fire
-    popupText = 'FIRE RATES!'; popupTimer = 2000;
     playSound('power');
   } else if (tile === WARP && warpCooldown <= 0) {
     // Teleport to the other warp point
@@ -773,7 +738,7 @@ function checkCollisions() {
     if (g.col === player.col && g.row === player.row) {
       if (g.scared) {
         g.eaten = true; g.scared = false; score += ghostScore; ghostScore *= 2; totalGhostsEaten++; playSound('ghost');
-      } else if (invincibleTimer <= 0 && shieldTimer <= 0 && fireTimer <= 0) {
+      } else if (invincibleTimer <= 0 && shieldTimer <= 0) {
         state = 'dying'; dyingTimer = 60; totalDeaths++; playSound('die');
       }
     }
@@ -859,15 +824,6 @@ function draw() {
           ctx.drawImage(passportSprite, x + half - size/2, y + half - size/2, size, size);
         }
         ctx.shadowBlur = 0;
-      } else if (t === FIRE) {
-        // Luggage fire pellet — orange/red glow
-        if (luggageSprite.complete && luggageSprite.naturalWidth > 0) {
-          const pulse = 0.9 + 0.1 * Math.sin(Date.now() * 0.004);
-          const size = T * 1.4 * pulse;
-          ctx.shadowColor = '#FF6B35'; ctx.shadowBlur = 10;
-          ctx.drawImage(luggageSprite, x + half - size/2, y + half - size/2, size, size);
-          ctx.shadowBlur = 0;
-        }
       } else if (t === GATE) {
         ctx.fillStyle = '#FF69B4';
         ctx.fillRect(x, y + half - 1.5, T, 3);
@@ -891,23 +847,6 @@ function draw() {
       // Flash during invincibility after death
       if (invincibleTimer > 0 && Math.floor(invincibleTimer / 100) % 2 === 0) {
         ctx.globalAlpha = 0.4;
-      }
-      // Fire effect
-      if (fireTimer > 0) {
-        const firePulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.01);
-        ctx.shadowColor = '#FF6B35';
-        ctx.shadowBlur = 20 * firePulse;
-        // Outer fire glow
-        ctx.fillStyle = `rgba(255, 107, 53, ${0.25 * firePulse})`;
-        ctx.beginPath();
-        ctx.arc(px + size / 2, py + size / 2, size * 0.8, 0, Math.PI * 2);
-        ctx.fill();
-        // Inner orange ring
-        ctx.strokeStyle = `rgba(255, 165, 0, ${0.5 + 0.3 * firePulse})`;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.arc(px + size / 2, py + size / 2, size * 0.55, 0, Math.PI * 2);
-        ctx.stroke();
       }
       // Shield glow effect
       if (shieldTimer > 0) {
